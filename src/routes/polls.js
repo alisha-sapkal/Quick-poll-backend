@@ -83,3 +83,15 @@ router.post('/:id/like', async (req, res) => {
 });
 
 export default router;
+ 
+// Delete poll
+router.delete('/:id', async (req, res) => {
+  try {
+    const deleted = await Poll.findByIdAndDelete(req.params.id);
+    if (!deleted) return res.status(404).json({ error: 'Not found' });
+    req.app.locals.broadcast('pollDeleted', { _id: req.params.id });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to delete poll' });
+  }
+});

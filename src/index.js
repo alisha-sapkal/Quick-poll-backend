@@ -32,7 +32,7 @@ const corsConfig = {
     if (o.endsWith('.vercel.app')) return callback(null, true);
     return callback(new Error(`CORS blocked from origin: ${origin}`));
   },
-  methods: ['GET', 'POST', 'OPTIONS'],
+methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Accept'],
   credentials: true,
 };

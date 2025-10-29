@@ -17,11 +17,23 @@ app.locals.broadcast = function broadcast(event, data) {
 };
 
 // Allow dev clients from any origin (or configure via CLIENT_ORIGIN)
+const allowedOrigins = process.env.CLIENT_ORIGIN
+  ? process.env.CLIENT_ORIGIN.split(',').map(o => o.trim())
+  : [];
+
 const corsConfig = {
-  origin: process.env.CLIENT_ORIGIN ? process.env.CLIENT_ORIGIN.split(',') : true,
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS blocked from origin: ${origin}`));
+    }
+  },
   methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Accept']
+  allowedHeaders: ['Content-Type', 'Accept'],
+  credentials: true,
 };
+
 app.use(cors(corsConfig));
 app.options('*', cors(corsConfig));
 app.set('trust proxy', true);

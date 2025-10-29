@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import mongoose from 'mongoose';
 import Poll from '../models/Poll.js';
 
 const router = Router();
@@ -6,6 +7,9 @@ const router = Router();
 // Create poll
 router.post('/', async (req, res) => {
   try {
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ error: 'Database unavailable, please try again shortly' });
+    }
     const { question, options } = req.body;
     if (!question || !Array.isArray(options) || options.length < 2)
       return res.status(400).json({ error: 'Question and at least 2 options required' });

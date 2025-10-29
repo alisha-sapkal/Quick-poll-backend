@@ -16,11 +16,21 @@ app.locals.broadcast = function broadcast(event, data) {
   }
 };
 
-app.use(cors({ origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173' }));
+// Allow dev clients from any origin (or configure via CLIENT_ORIGIN)
+const corsConfig = {
+  origin: process.env.CLIENT_ORIGIN ? process.env.CLIENT_ORIGIN.split(',') : true,
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Accept']
+};
+app.use(cors(corsConfig));
+app.options('*', cors(corsConfig));
+app.set('trust proxy', true);
 app.use(express.json());
 
 app.get('/api/health', (req, res) => {
-  res.json({ ok: true });
+  // db: 1=connected, 2=connecting, 0=disconnected, 3=disconnecting
+  const dbReady = mongoose.connection.readyState === 1;
+  res.json({ ok: true, db: dbReady ? 'up' : 'down' });
 });
 
 // SSE stream endpoint
@@ -53,16 +63,27 @@ app.use('/api/polls', pollsRouter);
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/quickpoll';
 const PORT = parseInt(process.env.PORT || '4000', 10);
 
-async function start() {
-  try {
-    await mongoose.connect(MONGO_URI, { dbName: 'quickpoll' });
-    console.log('MongoDB connected');
-
-    app.listen(PORT, () => console.log(`Server listening on http://localhost:${PORT}`));
-  } catch (err) {
-    console.error('Failed to start server', err);
-    process.exit(1);
-  }
+function connectWithRetry() {
+  const isSrv = MONGO_URI.startsWith('mongodb+srv://');
+  const connectOptions = {
+    serverSelectionTimeoutMS: 7000,
+    ...(isSrv ? {} : { dbName: 'quickpoll' })
+  };
+  mongoose.connect(MONGO_URI, connectOptions)
+    .then(() => {
+      console.log('MongoDB connected');
+    })
+    .catch((err) => {
+      const redacted = MONGO_URI.replace(/(:)([^@/]+)(@)/, '$1****$3');
+      console.error('MongoDB connection failed');
+      console.error('Mongo URI:', redacted);
+      console.error('Error:', err?.message || err);
+      if (MONGO_URI.startsWith('mongodb+srv://')) {
+        console.error('Tip: For MongoDB Atlas, ensure your deploy IP is allowlisted or set 0.0.0.0/0 during testing, and that the connection string/user credentials are valid.');
+      }
+      setTimeout(connectWithRetry, 5000);
+    });
 }
 
-start();
+app.listen(PORT, () => console.log(`Server listening on http://localhost:${PORT}`));
+connectWithRetry();

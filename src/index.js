@@ -17,17 +17,20 @@ app.locals.broadcast = function broadcast(event, data) {
 };
 
 // Allow dev clients from any origin (or configure via CLIENT_ORIGIN)
-const allowedOrigins = process.env.CLIENT_ORIGIN
-  ? process.env.CLIENT_ORIGIN.split(',').map(o => o.trim())
-  : [];
+const allowedOrigins = (process.env.CLIENT_ORIGIN || '')
+  .split(',')
+  .map((o) => o.trim().toLowerCase().replace(/\/$/, ''))
+  .filter(Boolean);
 
 const corsConfig = {
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error(`CORS blocked from origin: ${origin}`));
-    }
+    if (!origin) return callback(null, true);
+    const o = origin.toLowerCase().replace(/\/$/, '');
+    if (allowedOrigins.length === 0) return callback(null, true);
+    if (allowedOrigins.includes(o)) return callback(null, true);
+    // Allow Vercel preview domains by default
+    if (o.endsWith('.vercel.app')) return callback(null, true);
+    return callback(new Error(`CORS blocked from origin: ${origin}`));
   },
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Accept'],
